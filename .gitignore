@@ -1,0 +1,20 @@
+# Terraform working files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+plan.txt
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Bootstrap inputs contain your subscription and repo details
+bootstrap/terraform.tfvars
+
+# Commit provider lock files (.terraform.lock.hcl) - do not ignore them.

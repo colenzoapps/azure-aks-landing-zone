@@ -1,0 +1,77 @@
+name: drift-detection
+
+# Weekday plan against live infrastructure. If anything changed outside
+# Terraform (portal clicks, policy remediation, AKS-managed changes), an issue
+# is opened or updated so drift is visible rather than discovered at the next apply.
+on:
+  schedule:
+    - cron: "17 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  WORKDIR: environments/dev
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+  TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+  TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+  TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER }}
+  TF_VAR_pipeline_principal_object_id: ${{ vars.AZURE_APPLY_OBJECT_ID }}
+  TF_VAR_repository: ${{ github.repository }}
+
+jobs:
+  drift:
+    name: Detect drift (dev)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          working-directory: ${{ env.WORKDIR }}
+
+      - name: Plan
+        id: plan
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          set +e
+          terraform plan -lock=false -detailed-exitcode -no-color > plan.txt 2>&1
+          code=$?
+          set -e
+          cat plan.txt
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          echo "drift=$([ "$code" -eq 2 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Raise or update drift issue
+        if: steps.plan.outputs.drift == 'true'
+        uses: actions/github-script@v7
+        env:
+          PLAN_PATH: ${{ env.WORKDIR }}/plan.txt
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync(process.env.PLAN_PATH, 'utf8').slice(0, 60000);
+            const title = 'Infrastructure drift detected: dev';
+            const body = `Scheduled plan found changes outside Terraform.\n\n<details><summary>Plan</summary>\n\n\`\`\`hcl\n${plan}\n\`\`\`\n</details>\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: issues } = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'drift' });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: existing.number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['drift'] });
+            }

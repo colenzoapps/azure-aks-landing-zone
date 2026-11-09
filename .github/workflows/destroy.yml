@@ -1,0 +1,53 @@
+name: destroy
+
+# Manual teardown to stop the meter on the dev environment. The `dev`
+# environment's required-reviewer gate is the confirmation step, and the job
+# only runs from main so a branch cannot alter what gets destroyed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  WORKDIR: environments/dev
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_APPLY }}
+  TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+  TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+  TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER }}
+  TF_VAR_pipeline_principal_object_id: ${{ vars.AZURE_APPLY_OBJECT_ID }}
+  TF_VAR_repository: ${{ github.repository }}
+
+jobs:
+  destroy:
+    name: Destroy (dev)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          working-directory: ${{ env.WORKDIR }}
+
+      - name: Plan destroy
+        working-directory: ${{ env.WORKDIR }}
+        run: terraform plan -destroy -lock-timeout=5m -out=destroy.tfplan
+
+      - name: Destroy
+        working-directory: ${{ env.WORKDIR }}
+        run: terraform apply -lock-timeout=5m -input=false destroy.tfplan

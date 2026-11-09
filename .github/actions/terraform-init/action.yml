@@ -1,0 +1,34 @@
+name: Terraform init
+description: Install Terraform and initialise a root module against the Azure remote state backend using OIDC.
+
+inputs:
+  working-directory:
+    description: Root module to initialise.
+    required: true
+  terraform-version:
+    description: Terraform version constraint.
+    required: false
+    default: "~1.13.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    # Backend coordinates come from the calling workflow's env (TFSTATE_*),
+    # because composite actions cannot read the `vars` context.
+    - name: Terraform init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        : "${TFSTATE_RESOURCE_GROUP:?TFSTATE_RESOURCE_GROUP is not set}"
+        : "${TFSTATE_STORAGE_ACCOUNT:?TFSTATE_STORAGE_ACCOUNT is not set}"
+        : "${TFSTATE_CONTAINER:?TFSTATE_CONTAINER is not set}"
+        terraform init -input=false \
+          -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+          -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+          -backend-config="container_name=${TFSTATE_CONTAINER}"

@@ -1,0 +1,6 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+location            = "uksouth"
+project             = "lz"
+github_owner        = "your-github-username"
+github_repo         = "azure-aks-landing-zone"
+github_environments = ["dev"]
