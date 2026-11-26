@@ -108,3 +108,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "allow_unmanaged_resource_deletion" {
+  description = "Let destroy delete resource groups that still hold resources created outside Terraform. Set only for a local `make destroy ALLOW_UNMANAGED=true`, after the teardown audit has listed them."
+  type        = bool
+  default     = false
+}
