@@ -61,13 +61,13 @@ variable "aks_sku_tier" {
 variable "system_node_vm_size" {
   description = "System pool VM size."
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 variable "apps_node_vm_size" {
   description = "Apps pool VM size."
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 variable "availability_zones" {
