@@ -27,7 +27,7 @@ resource "azurerm_role_assignment" "network_contributor" {
 resource "azurerm_kubernetes_cluster" "this" {
   #checkov:skip=CKV_AZURE_170:Free tier (no uptime SLA) is deliberate for dev; set sku_tier = "Standard" for prod.
   #checkov:skip=CKV_AZURE_117:Customer-managed disk encryption keys add a Disk Encryption Set and key lifecycle; out of scope for dev.
-  #checkov:skip=CKV_AZURE_226:Ephemeral OS disks need a VM size with a cache/temp disk; the default D2s_v5 has none.
+  #checkov:skip=CKV_AZURE_226:Ephemeral OS disks need a VM size with a cache/temp disk; the default D2s_v4 has none.
   #checkov:skip=CKV_AZURE_227:Host encryption requires the EncryptionAtHost feature registered on the subscription; toggle via var.host_encryption_enabled.
   name                = var.name
   location            = var.location
