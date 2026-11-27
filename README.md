@@ -60,6 +60,28 @@ flowchart LR
 
 More detail, including the address plan and the trust model, is in [docs/architecture.md](docs/architecture.md).
 
+### As deployed
+
+Exported from the Azure portal's Resource visualizer after a pipeline deployment.
+
+**`rg-lz-dev-uks-aks`: the cluster and its spoke network**
+
+![Resource visualizer for rg-lz-dev-uks-aks: the AKS cluster linked to the spoke VNet, which has three subnet NSGs, alongside the control-plane identity and the Container Insights data collection rule](docs/images/rg-lz-dev-uks-aks.png)
+
+- The cluster is deployed into the spoke VNet defined here, not a network AKS creates for itself, so subnets, NSGs and routing stay under Terraform's control.
+- Each subnet (nodes, ingress, private endpoints) has its own NSG.
+- `id-aks-lz-dev-uks-control-plane` is a user-assigned identity. It holds only Network Contributor on the spoke VNet and Private DNS Zone Contributor on the AKS zone.
+- `MSCI-uksouth-aks-lz-dev-uks` is the data collection rule that sends Container Insights data to Log Analytics.
+
+**`rg-lz-dev-uks-aks-nodes`: resources AKS manages itself**
+
+![Resource visualizer for rg-lz-dev-uks-aks-nodes: the kube-apiserver private endpoint and its NIC, the system and apps node scale sets behind the outbound load balancer and public IP, the node NSG, and the add-on managed identities](docs/images/rg-lz-dev-uks-aks-nodes.png)
+
+- The `kube-apiserver` private endpoint is what makes this a private cluster: the API server has no public endpoint and is reached only from inside the VNet. CI reaches it with `az aks command invoke`.
+- There are two node pools: `aks-system` runs cluster components, and `aks-apps` runs workloads and autoscales down to zero.
+- The `kubernetes` load balancer and its public IP carry the nodes' outbound internet traffic only. With `enable_firewall = true`, egress goes through Azure Firewall instead.
+- The add-on identities are for the kubelet (pulling from ACR), the Key Vault secrets provider and Azure Policy.
+
 ## Repository layout
 
 ```
