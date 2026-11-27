@@ -221,9 +221,23 @@ jobs:
 
       # The API server is private, so a hosted runner cannot reach it directly.
       # `command invoke` runs kubectl inside the cluster via the ARM API.
+      # The CLI is pinned: 2.93 on the current runner image fails while polling
+      # for the result ("Operation returned an invalid status 'OK'"); 2.77 works.
+      # command invoke does not fail when kubectl does, so exit with its code.
       - name: Smoke test private cluster
-        run: |
-          az aks command invoke \
-            --resource-group "${{ steps.tf.outputs.aks_rg }}" \
-            --name "${{ steps.tf.outputs.aks_name }}" \
-            --command "kubectl get nodes -o wide && kubectl get pods -n kube-system"
+        uses: azure/cli@v2
+        env:
+          AKS_RG: ${{ steps.tf.outputs.aks_rg }}
+          AKS_NAME: ${{ steps.tf.outputs.aks_name }}
+        with:
+          azcliversion: 2.77.0
+          inlineScript: |
+            result=$(az aks command invoke \
+              --resource-group "$AKS_RG" \
+              --name "$AKS_NAME" \
+              --command "kubectl get nodes -o wide && kubectl get pods -n kube-system" \
+              -o json)
+            jq -r '.logs' <<<"$result"
+            code=$(jq -r '.exitCode' <<<"$result")
+            echo "kubectl exit code: $code"
+            exit "$code"
