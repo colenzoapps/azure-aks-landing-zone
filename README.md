@@ -160,7 +160,7 @@ Approximate UK South pay-as-you-go prices with the default settings. Check the [
 | Component | Approx. cost |
 |---|---|
 | AKS control plane (Free tier) | £0 |
-| 1 × Standard_D2s_v5 system node | ~£55/month |
+| 1 × Standard_D2s_v4 system node | ~£55/month |
 | Apps pool (scales to 0 when idle) | £0 idle |
 | ACR Premium | ~£40/month |
 | Private endpoints (2) + Standard LB + public IP | ~£35/month |
