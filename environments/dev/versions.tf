@@ -23,8 +23,9 @@ provider "azurerm" {
       purge_soft_delete_on_destroy = false
     }
     resource_group {
-      # Refuse to delete resource groups holding resources Terraform does not manage.
-      prevent_deletion_if_contains_resources = true
+      # Refuse to delete resource groups holding resources Terraform does not manage,
+      # unless a teardown run has reviewed them (scripts/teardown-audit.sh) and opted in.
+      prevent_deletion_if_contains_resources = !var.allow_unmanaged_resource_deletion
     }
   }
   storage_use_azuread = true

@@ -3,6 +3,14 @@ name: destroy
 # Manual teardown to stop the meter on the dev environment. The `dev`
 # environment's required-reviewer gate is the confirmation step, and the job
 # only runs from main so a branch cannot alter what gets destroyed.
+#
+# Around the destroy, scripts/teardown-audit.sh inventories the environment:
+#   before : every resource, sorted into Terraform-managed, AKS-managed and
+#            UNMANAGED (created outside Terraform). Unmanaged resources stop the
+#            run before anything is deleted: delete or import them, or remove
+#            them deliberately with `make destroy ALLOW_UNMANAGED=true`.
+#   after  : fails the run if any resource group or tagged resource survived.
+# Both reports land in the run summary.
 on:
   workflow_dispatch:
 
@@ -44,10 +52,29 @@ jobs:
         with:
           working-directory: ${{ env.WORKDIR }}
 
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID_APPLY }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Audit before destroy
+        env:
+          TF_DIR: ${{ env.WORKDIR }}
+        run: scripts/teardown-audit.sh pre
+
       - name: Plan destroy
         working-directory: ${{ env.WORKDIR }}
         run: terraform plan -destroy -lock-timeout=5m -out=destroy.tfplan
 
       - name: Destroy
+        id: destroy
         working-directory: ${{ env.WORKDIR }}
         run: terraform apply -lock-timeout=5m -input=false destroy.tfplan
+
+      # Runs even if the destroy failed partway, so the summary shows what is left.
+      - name: Verify nothing is left
+        if: always() && steps.destroy.outcome != 'skipped'
+        env:
+          TF_DIR: ${{ env.WORKDIR }}
+        run: scripts/teardown-audit.sh post

@@ -71,6 +71,9 @@ modules/
   acr/                     Private container registry + private endpoint
   keyvault/                Private RBAC Key Vault + private endpoint
   monitoring/              Log Analytics workspace
+scripts/
+  teardown-audit.sh        Read-only inventory before destroy, leftover check after
+  destroy-bootstrap.sh     Final teardown of state account + GitHub identities
 .github/
   actions/terraform-init/  Composite action: install Terraform + init backend
   workflows/
@@ -166,6 +169,48 @@ Approximate UK South pay-as-you-go prices with the default settings. Check the [
 | Azure Firewall Standard (`enable_firewall = true`) | ~£25/day extra |
 
 Run the **destroy** workflow when you are not using it. The state account (pennies) stays.
+
+## Teardown
+
+A full deployment creates six resource groups: `rg-lz-tfstate` from bootstrap, plus four for dev (`rg-lz-dev-uks-hub`, `-aks`, `-shared` and `-monitoring`), plus `rg-lz-dev-uks-aks-nodes`, which AKS creates and owns. Azure may also add a `NetworkWatcherRG` on its own the first time a VNet is created.
+
+[`scripts/teardown-audit.sh`](scripts/teardown-audit.sh) makes sure the teardown leaves nothing behind that you didn't know about. It is read-only, and it runs on both sides of the destroy.
+
+| Phase | What it checks | Fails when |
+|---|---|---|
+| `pre` | Every resource in the environment's groups, plus anything tagged `project`/`environment` elsewhere. Each one is labelled `managed`, `aks-managed`, `pe-nic`, `UNMANAGED` (made outside Terraform) or `OUTSIDE` (tagged for this environment but in another group). | Anything is `UNMANAGED` or `OUTSIDE`, so the run stops before anything is deleted |
+| `post` | Remaining resource groups, tagged resources and Terraform state entries. It also lists leftovers that cost nothing: NetworkWatcherRG, and soft-deleted Key Vaults with their purge date. | Anything billable is still there |
+
+### 1. Destroy an environment
+
+From GitHub: **Actions → destroy → Run workflow**, then approve the `dev` deployment. Both audits are written to the run summary. If the `pre` audit finds `UNMANAGED` resources, the run stops before anything is deleted. Check the list, then either delete or import those resources, or remove them along with everything else using `make destroy ALLOW_UNMANAGED=true` locally.
+
+Locally:
+
+```bash
+make audit                        # read-only inventory
+make destroy                      # audit, terraform destroy, then verify
+make destroy ALLOW_UNMANAGED=true # also remove what the audit flagged
+```
+
+### 2. Remove the bootstrap layer (only when you are completely finished)
+
+```bash
+scripts/destroy-bootstrap.sh      # or: make destroy-bootstrap
+```
+
+The script first runs the `post` audit for every environment, and refuses to continue if anything remains, because the environments' state lives in the account it is about to delete. After you type the resource group name to confirm, it removes:
+
+1. the GitHub identities' subscription role assignments
+2. both Entra app registrations
+3. the state account's delete lock and the `rg-lz-tfstate` group
+
+It finishes by printing the local and GitHub clean-up commands. Terraform's `destroy` isn't used here, because `prevent_destroy` and the lock deliberately protect the state account from it.
+
+Things that are kept but cost nothing:
+
+- The Key Vault stays soft-deleted for 7 days. Purge protection prevents an earlier purge, and the next deploy uses a fresh name.
+- Deleted Entra apps sit in the recycle bin for 30 days.
 
 ## Validation
 

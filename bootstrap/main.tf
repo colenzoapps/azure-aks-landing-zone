@@ -13,6 +13,16 @@ data "azurerm_subscription" "current" {}
 locals {
   github_issuer = "https://token.actions.githubusercontent.com"
   repo          = "${var.github_owner}/${var.github_repo}"
+
+  # GitHub's immutable subject format embeds the numeric owner and repo IDs, so
+  # a deleted or renamed repo cannot be recreated by someone else to inherit
+  # this trust. It is the default for new repos; check yours with
+  #   gh api repos/OWNER/REPO/actions/oidc/customization/sub
+  subject_prefix = (
+    var.github_owner_id != null && var.github_repo_id != null
+    ? "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+    : "repo:${local.repo}"
+  )
   tags = merge(var.tags, {
     workload   = "terraform-state"
     managed_by = "terraform-bootstrap"
@@ -21,13 +31,13 @@ locals {
   identities = {
     plan = {
       subjects = {
-        pull-request = "repo:${local.repo}:pull_request"
-        main         = "repo:${local.repo}:ref:refs/heads/main"
+        pull-request = "${local.subject_prefix}:pull_request"
+        main         = "${local.subject_prefix}:ref:refs/heads/main"
       }
     }
     apply = {
       subjects = {
-        for env in var.github_environments : "env-${env}" => "repo:${local.repo}:environment:${env}"
+        for env in var.github_environments : "env-${env}" => "${local.subject_prefix}:environment:${env}"
       }
     }
   }
