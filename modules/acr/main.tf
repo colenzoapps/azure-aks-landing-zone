@@ -43,10 +43,11 @@ resource "azurerm_private_endpoint" "this" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "this" {
-  name                           = "diag-to-law"
-  target_resource_id             = azurerm_container_registry.this.id
-  log_analytics_workspace_id     = var.log_analytics_workspace_id
-  log_analytics_destination_type = "Dedicated"
+  name                       = "diag-to-law"
+  target_resource_id         = azurerm_container_registry.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+  # No log_analytics_destination_type: Azure does not persist it for
+  # registries, so setting it leaves a permanent diff (and false drift alerts).
 
   enabled_log {
     category_group = "audit"
