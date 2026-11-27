@@ -24,9 +24,19 @@ lock:
 	for d in $(DIR) bootstrap; do terraform -chdir=$$d init -backend=false -input=false >/dev/null && \
 	  terraform -chdir=$$d providers lock -platform=linux_amd64 -platform=darwin_arm64 -platform=darwin_amd64 -platform=windows_amd64; done
 
-# Requires TFSTATE_RESOURCE_GROUP, TFSTATE_STORAGE_ACCOUNT, TFSTATE_CONTAINER and ARM_SUBSCRIPTION_ID, plus `az login`.
+# Backend and subscription settings come from the environment when set, otherwise
+# from bootstrap's local outputs and the current `az login`.
+bootstrap_output = $(shell terraform -chdir=bootstrap output -raw $(1) 2>/dev/null)
+TFSTATE_RESOURCE_GROUP  ?= $(call bootstrap_output,tfstate_resource_group)
+TFSTATE_STORAGE_ACCOUNT ?= $(call bootstrap_output,tfstate_storage_account)
+TFSTATE_CONTAINER       ?= $(call bootstrap_output,tfstate_container)
+ARM_SUBSCRIPTION_ID     ?= $(shell az account show --query id -o tsv 2>/dev/null)
+export ARM_SUBSCRIPTION_ID
+
 init:
-	terraform -chdir=$(DIR) init \
+	@test -n "$(TFSTATE_STORAGE_ACCOUNT)" || { echo "State backend unknown: set TFSTATE_* or keep bootstrap/terraform.tfstate locally."; exit 1; }
+	@test -n "$(ARM_SUBSCRIPTION_ID)" || { echo "No subscription: run az login or set ARM_SUBSCRIPTION_ID."; exit 1; }
+	terraform -chdir=$(DIR) init -reconfigure -input=false \
 	  -backend-config="resource_group_name=$(TFSTATE_RESOURCE_GROUP)" \
 	  -backend-config="storage_account_name=$(TFSTATE_STORAGE_ACCOUNT)" \
 	  -backend-config="container_name=$(TFSTATE_CONTAINER)"
