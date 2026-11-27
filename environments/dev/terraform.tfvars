@@ -5,10 +5,12 @@ environment    = "dev"
 location       = "uksouth"
 location_short = "uks"
 
-enable_firewall     = false
-aks_sku_tier        = "Free"
-system_node_vm_size = "Standard_D2s_v5"
-apps_node_vm_size   = "Standard_D2s_v5"
+enable_firewall = false
+aks_sku_tier    = "Free"
+# DSv4 rather than DSv5: new subscriptions often start with 0 DSv5 quota.
+# Check yours: az vm list-usage -l uksouth -o table | grep -i "family"
+system_node_vm_size = "Standard_D2s_v4"
+apps_node_vm_size   = "Standard_D2s_v4"
 availability_zones  = ["1", "2", "3"]
 
 # Add yourself so you can run `az aks command invoke` and kubectl via a jump host:

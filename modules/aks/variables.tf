@@ -71,7 +71,7 @@ variable "service_cidr" {
 variable "system_node_vm_size" {
   description = "VM size for the system pool."
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 variable "system_node_min_count" {
@@ -95,7 +95,7 @@ variable "apps_pool_enabled" {
 variable "apps_node_vm_size" {
   description = "VM size for the apps pool."
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 variable "apps_node_min_count" {
